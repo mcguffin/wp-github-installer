@@ -7,6 +7,7 @@ Version: 0.0.1
 Author: Jörn Lund
 Author URI: https://github.com/mcguffin/
 Text Domain: github
+Network: true
 */
 
 
@@ -19,19 +20,59 @@ To Do:
 
 
 class GitHub_Installer {
+	private static $instance;
 	
-	function __construct() {
+	public static function instance() {
+		if ( ! isset( self::$instance ) )
+			self::$instance = new self();
+		return self::$instance;
+	}
+	
+	private function __construct() {
+	
+		if ( ! is_multisite() && is_admin() ) {
+			add_option( 'github_access_token' , '' , '' , 'yes' );
+		} else if ( is_multisite() && is_network_admin() ) {
+			add_site_option( 'github_access_token' , '' , '' , 'yes' );
+		}
+		
+		// will add github notes to plugin meta
 		add_filter('plugin_row_meta',array($this,'plugin_meta'),10,4);
-		add_action( 'upgrader_process_complete' , array( &$this , 'after_plugin_upgrade' ) , 10 , 3 );
-		// do this only on 
-		/*
-		add_action('load-update.php' , array( &$this,'fake_update' ));
-		/*/
+
+		// will store current commit sha
+		add_action( 'upgrader_process_complete' , array( &$this , 'after_plugin_upgrade' ) , 10 , 2 );
+		
+		// will add update notices to github plugins
 		add_filter('site_transient_update_plugins',array(&$this,'filter_github_plugins'));
-		//*/
+
+		// will add and render the github plugin install tabb
 		add_filter( 'install_plugins_tabs', array(&$this,'install_plugins_tabs') );
 		add_action('install_plugins_github' , array(&$this,'install_github_plugin') );
+
+
 		add_filter('plugins_api',array(&$this,'github_download_api'),10,3);
+		
+		// rename downloaded source package to proper WP plugin name
+		add_filter( 'upgrader_source_selection' , array(&$this,'source_selection') , 10 , 3 );
+	}
+	function source_selection($source, $remote_source, $wp_upgrader ) {
+		$new_name = trailingslashit($remote_source).dirname($wp_upgrader->skin->plugin);
+		if (rename( $source , $new_name ) )
+			return $new_name;
+		else 
+			return $source;
+	}
+	function get_access_token() {
+		$token = false;
+		if ( is_multisite() && is_network_admin() )
+			$token = get_site_option( 'github_access_token' );
+		else 
+			$token = get_option( 'github_access_token' );
+
+		if ( $token )
+			return $token;
+			
+		return false;
 	}
 	
 	function install_plugins_tabs( $tabs ) {
@@ -52,6 +93,7 @@ class GitHub_Installer {
 	}
 	
 	function github_download_api( $result , $action , $args ) {
+		$result = false;
 		if ($action == 'plugin_information' && isset($_REQUEST['source']) ) {
 			if ( ! $url = esc_url($_POST['github-plugin-url'],array('http','https')) )
 				return new WP_Error('no_url_specified',__('You did not specify a proper URL.'));
@@ -74,10 +116,6 @@ class GitHub_Installer {
 	
 	
 	
-	function fake_update() {
-		add_filter('site_transient_update_plugins',array(&$this,'filter_github_plugins'));
-	}
-	
 	function is_github_plugin( $plugin_file , $plugin_data = null ){
 		if ( is_null( $plugin_data ) )
 			$plugin_data = get_plugin_data( WP_PLUGIN_DIR . '/' . $plugin_file, false, true);
@@ -86,28 +124,27 @@ class GitHub_Installer {
 	
 	function plugin_meta($plugin_meta, $plugin_file, $plugin_data, $status){
 		if ( $this->is_github_plugin( $plugin_file, $plugin_data ) ) {
-			
-			$repo = new GitHub_Repo($plugin_data['PluginURI']);
-			array_unshift($plugin_meta,'<img src="https://github.com/favicon.ico" /> ' . substr($repo->get_installed_sha(),0,10) );
+			$repo = new GitHub_Repo( $plugin_data['PluginURI'] );
+			array_unshift($plugin_meta,'<img src="https://github.com/favicon.ico" /> ' . substr($repo->get_installed_info()->commit->sha,0,10) );
 		}
 		
 		return $plugin_meta;
 	}
 	function filter_github_plugins( $current ) {
-		
-		foreach ( $current->checked as $plugin_file => $version ) {
-			if ( file_exists(WP_PLUGIN_DIR . '/' . $plugin_file ) ) {
-				$plugin_data = get_plugin_data( WP_PLUGIN_DIR . '/' . $plugin_file, false, true);
-				if ( $this->is_github_plugin( $plugin_file,$plugin_data ) ) {
-					$repo = new GitHub_Repo($plugin_data['PluginURI']);
-					$commit = $repo->get_latest_commit();
-					if ( ! is_wp_error( $commit ) ) {
-						if ( $commit->sha != $repo->get_installed_sha()) {
-							$current->checked[$plugin_file] = $repo->get_installed_sha();
+		if ( isset( $current->checked ) ) {
+			foreach ( $current->checked as $plugin_file => $version ) {
+				if ( file_exists(WP_PLUGIN_DIR . '/' . $plugin_file ) ) {
+					$plugin_data = get_plugin_data( WP_PLUGIN_DIR . '/' . $plugin_file, false, true);
+					if ( $this->is_github_plugin( $plugin_file,$plugin_data ) ) {
+						$repo 	= new GitHub_Repo($plugin_data['PluginURI']);
+						$commit = $repo->get_latest_commit();
+						$info	= $repo->get_installed_info();
+						if ( $commit->commit->sha != $info->commit->sha ) {
+							$current->checked[$plugin_file] = $info->commit->sha;
 							$current->response[$plugin_file] = (object) array(
 								'id' => '',
 								'slug' => $repo->get_plugin_slug(),
-								'new_version' => $commit->sha,
+								'new_version' => $commit->commit->sha,
 								'url' => $plugin_data['PluginURI'],
 								'package' => $repo->get_download_url( ),
 							);
@@ -119,14 +156,19 @@ class GitHub_Installer {
 		return $current;
 	}
 	
-	function after_plugin_upgrade( $upgrader , $args , $plugin_file ) {
-		$plugin_data = get_plugin_data( WP_PLUGIN_DIR . '/' . $plugin_file, false, true);
+	function after_plugin_upgrade( $upgrader , $args ) {
+		extract($args);
+		$plugin_data = get_plugin_data( WP_PLUGIN_DIR . '/' . $plugin, false, true);
 		$repo = new GitHub_Repo($plugin_data['PluginURI']);
-		$repo->set_installed_sha();
+		if ( $repo->is_valid() )
+			$repo->set_installed_info();
 	}
 
 }
 
-require_once dirname(__FILE__).'/inc/class-github-repo.php';
+GitHub_Installer::instance();
 
-$github_installer = new GitHub_Installer();
+require_once dirname(__FILE__).'/inc/class-github-api.php';
+require_once dirname(__FILE__).'/inc/class-github-repo.php';
+require_once dirname(__FILE__).'/inc/class-github-admin.php';
+
