@@ -26,11 +26,20 @@ class GitHub_Repo {
 			$this->slug = $matches[2];
 		}
 		if ( $this->is_valid() ) {
-			$this->repo_data = $this->api->get_repo($this->user,$this->slug);
-			$this->branches = $this->api->get_repo_branches($this->user,$this->slug);
-			$this->transient_key = sprintf( "githubl-%s",md5( $this->user.'/'.$this->slug ) );
+			$this->transient_key	= sprintf( "githubl-%s",md5( $this->user.'/'.$this->slug ) );
+
+			// get remote data
+			$this->repo_data	= $this->api->get_repo($this->user,$this->slug);
+			$this->branches		= $this->api->get_repo_branches($this->user,$this->slug);
+			$this->branch		= $this->get_install_info()->name;
 		}
 	}
+	
+	function set_branch( $branch = false ) {
+		if ( $this->get_branch( $branch ) )
+			$this->branch = $branch;
+	}
+	
 	function is_valid() {
 		return $this->user && $this->slug;
 	}
@@ -47,12 +56,12 @@ class GitHub_Repo {
 		return $this->repo_data->html_url;
 	}
 
-	function set_installed_info() {
+	function set_install_info() {
 		$commit = $this->get_latest_commit(); // contains sha, 
 		$commit->updated_at = strtotime( $this->repo_data->updated_at );
 		set_site_transient( $this->transient_key , $commit , 0 );
 	}
-	function get_installed_info() {
+	function get_install_info() {
 		if ( $commit = get_site_transient( $this->transient_key ) )
 			return $commit;
 		else 
@@ -65,12 +74,28 @@ class GitHub_Repo {
 				),
 			);
 	}
-	
-	function get_latest_commit( ) {
-		$branch = $this->get_installed_info()->name;
-		return $this->get_branch( $branch );
+	function delete_install_info() {
+		if ( get_site_transient( $this->transient_key ) )
+			delete_site_transient( $this->transient_key );
+	}
+	function clear_cache() {
+		$this->api->clear_cache( $this->user , $this->slug );
 	}
 	
+	function get_latest_commit( ) {
+		$branch = $this->get_install_info()->name;
+		return $this->get_branch( $branch );
+	}
+	function get_branches( ) {
+		if ( $this->is_valid() )
+			return $this->branches;
+		return false;
+	}
+	function get_repo_data( ) {
+		if ( $this->is_valid() )
+			return $this->repo_data;
+		return false;
+	}
 	function get_branch( $branch_slug ) {
 		foreach ( $this->branches as $branch ) {
 			if ( $branch_slug == $branch->name )

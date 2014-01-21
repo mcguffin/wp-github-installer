@@ -19,7 +19,7 @@ class GitHub_API {
 	
 	public static function instance( $access_token = false ) {
 		if ( ! isset( self::$instance ) )
-			self::$instance = new self( $access_token );
+			self::$instance = new GitHub_Api( $access_token );
 		return self::$instance;
 	}
 	
@@ -65,7 +65,16 @@ class GitHub_API {
 		return $zip_url;
 	}
 	
-	
+	function clear_cache( $user , $repo ) {
+		foreach ( array(
+				$this->get_api_url('repos/%s/%s' , $user , $repo ),
+				$this->get_api_url('repos/%s/%s/branches' , $user , $repo ),
+			) as $url ) {
+			
+			$site_transient_key = sprintf("github-%s",md5($url));
+			delete_site_transient( $site_transient_key );
+		}
+	}
 	
 	
 	// root dir: /repos/:owner/:repo/contents/
@@ -97,16 +106,15 @@ class GitHub_API {
 		
 			$response = wp_remote_get( $url );
 			
-			// update ratelimit
-		
 			if ( ! is_wp_error($response) && $response['response']['code'] == 200 ) {
+				// update ratelimit
 				if ( isset( $response['headers']['x-ratelimit-limit'] ) ) {
 					$this->ratelimit_limit		= $response['headers']['x-ratelimit-limit'];
 					$this->ratelimit_remaining	= $response['headers']['x-ratelimit-remaining'];
 					$this->ratelimit_reset		= $response['headers']['x-ratelimit-reset'];
 				}
 				$response_data = json_decode($response['body']);
-				
+
 			} else if ( is_wp_error($response) ) {
 				$errors[] = $response;
 			} else {
