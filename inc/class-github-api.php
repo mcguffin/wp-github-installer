@@ -24,16 +24,33 @@ class GitHub_API {
 	}
 	
 	private function __construct( $access_token = false ) {
+		
+		if ( $access_token && $this->test_access_token( $access_token ) === true )
+			$this->access_token = $access_token;
+		else 
+			$this->access_token = false;
+	}
+	function set_access_token( $access_token ) {
 		$this->access_token = $access_token;
+	}
+	
+	function test_access_token( $access_token ) {
+		$response = null;
+		$this->get_api_response( add_query_arg('access_token' , $access_token , $this->get_api_url() ) , $response );
+		if ( $response['response']['code'] == 200 )
+			return true;
+		return $response;
 	}
 	
 	function get_repo( $user , $repo ) {
 		$url = $this->get_api_url('repos/%s/%s' , $user , $repo );
-		return $this->get_cached_api_response( $url );
+		$repo = $this->get_cached_api_response( $url );
+		return $repo;
 	}
 	function get_repo_branches( $user , $repo ) {
 		$url = $this->get_api_url('repos/%s/%s/branches' , $user , $repo );
-		return $this->get_cached_api_response( $url );
+		$branches = $this->get_cached_api_response( $url );
+		return $branches;
 	}	
 	function get_repo_zip_url( $user , $repo , $branch = false ) {
 		if ( $branch )
@@ -44,27 +61,7 @@ class GitHub_API {
 		return $url;
 	}
 	
-	
-	function get_repo_zip_response( $user , $repo , $branch = false , &$response = null ) {
-		$url = $this->get_repo_zip_url( $user , $repo , $branch );
-		$this->get_api_response( $url , $response );
-		var_dump($response);
-		return $response;
-		$zip_url = false;
-		if ( ! $branch && ( $repo_data = $this->get_repo( $user , $repo ) ) ) {
-			// get branch from master_branch
-			$branch = $repo_data->master_branch;
-		}
-		if ( $branch ) {
-			$url = $this->get_api_url('repos/%s/%s/zipball/%s' , $user , $repo , $branch );
-			$data = $this->get_cached_api_response( $url , true );
-			var_dump($data);
-			if ( $data['Location'] )
-				$zip_url = $data['Location'];
-		}
-		return $zip_url;
-	}
-	
+		
 	function clear_cache( $user , $repo ) {
 		foreach ( array(
 				$this->get_api_url('repos/%s/%s' , $user , $repo ),
@@ -80,7 +77,7 @@ class GitHub_API {
 	// root dir: /repos/:owner/:repo/contents/
 	// zip: /repos/:owner/:repo/zip/:branch
 	
-	private function get_api_url( $skeleton ) {
+	private function get_api_url( $skeleton = '' ) {
 		$args = func_get_args();
 		$args[0] = self::API_URL.$skeleton;
 		$url = call_user_func_array( 'sprintf' , $args );

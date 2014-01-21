@@ -96,7 +96,11 @@ class GitHub_Repo {
 			return $this->repo_data;
 		return false;
 	}
-	function get_branch( $branch_slug ) {
+	function get_branch( $branch_slug = false ) {
+		if ( ! $branch_slug )
+			$branch_slug = $this->repo_data->default_branch;
+		if ( ! $branch_slug || ! $this->branches )
+			return false;
 		foreach ( $this->branches as $branch ) {
 			if ( $branch_slug == $branch->name )
 				return $branch;

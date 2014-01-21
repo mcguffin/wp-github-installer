@@ -3,7 +3,7 @@
 Plugin Name: WordPress GitHub Installer
 Plugin URI: https://github.com/mcguffin/wp-github-installer
 Description: Install and update plugins from public github repositories.
-Version: 0.0.1
+Version: 0.0.2
 Author: Jörn Lund
 Author URI: https://github.com/mcguffin/
 Text Domain: github
@@ -55,6 +55,7 @@ class GitHub_Installer {
 
 		// store current installed info
 		add_action( 'upgrader_process_complete' , array( &$this , 'after_plugin_upgrade' ) , 10 , 2 );
+//		add_filter( 'upgrader_post_install' , array( &$this , 'after_plugin_install' ) , 10 , 3 );
 
 		add_filter('plugins_api',array(&$this,'github_download_api'),10,3);
 		
@@ -62,9 +63,18 @@ class GitHub_Installer {
 		add_filter( 'upgrader_source_selection' , array(&$this,'source_selection') , 10 , 3 );
 		
 		
-		
 		add_action( 'wp_ajax_get-github-repo-branches' , array( &$this , 'ajax_get_repo_branches' ) );
+		
+		add_filter( 'upgrader_pre_download' , array(&$this,'before_download') , 10 , 3);
 	}
+	
+	function before_download( $reply , $package , $upgrader ){
+		// dont show zip url, when it contains an access token
+		if ( preg_match( '/access_token=([a-f0-9]+)/' , $package ) )
+			$upgrader->strings['downloading_package'] = __('Downloading install package &#8230;','github'); 
+		return $reply;
+	}
+	
 	function loaded(){
 		load_plugin_textdomain( 'github', false, dirname( plugin_basename( __FILE__ ) ) . '/lang/' );
 	}
@@ -144,15 +154,15 @@ class GitHub_Installer {
 			
 			$repo = new GitHub_Repo( $url );
 			
-			if ( $branch = sanitize_title($_POST['github-plugin-branch']) )
+			if ( isset($_POST['github-plugin-branch']) && ( $branch = sanitize_title($_POST['github-plugin-branch']) ) )
 				$repo->set_branch( $branch );
-			
+
 			// check for 
 			if ( $repo->is_valid() )
 				$result = (object) array(
 					'name' => $repo->get_plugin_slug( ),//__('GitHub plugin','github'),
 					'slug' => $repo->get_plugin_slug( ),
-					'version' => $repo->get_branch( $branch )->commit->sha,
+					'version' => $repo->get_branch( )->commit->sha,
 					'homepage' =>  $repo->get_repository_url( ),
 					'download_link' => $repo->get_download_url( ),
 				);
@@ -187,7 +197,7 @@ class GitHub_Installer {
 						$repo 	= new GitHub_Repo($plugin_data['PluginURI']);
 						$commit = $repo->get_latest_commit();
 						$info	= $repo->get_install_info();
-						if ( $commit->commit->sha != $info->commit->sha ) {
+						if ( $info && $commit &&  $commit->commit->sha != $info->commit->sha ) {
 							$current->checked[$plugin_file] = $info->commit->sha;
 							$current->response[$plugin_file] = (object) array(
 								'id' => '',
@@ -221,10 +231,31 @@ class GitHub_Installer {
 		else 
 			return $source;
 	}
-	function after_plugin_upgrade( $upgrader , $args ) {
+	function after_plugin_install( $res , $extra , $result ) {
+		return $res;
+	}
+	function after_plugin_upgrade( $wp_upgrader , $args ) {
 		extract($args);
-		if ( ! isset( $plugins ) && isset( $plugin ) ) 
-			$plugins = (array) $plugin;
+		if ( is_a($wp_upgrader->skin,'Plugin_Upgrader_Skin' ) ) {
+			$plugins = array( $wp_upgrader->skin->plugin );
+		} else if ( is_a( $wp_upgrader->skin , 'Bulk_Plugin_Upgrader_Skin' ) ) {
+			$url_query = parse_url( $wp_upgrader->skin->options['url'] , PHP_URL_QUERY );
+			$url_param = array();
+			parse_str($url_query,$url_param);
+			$plugins = explode(',',$url_param['plugins']); 
+		} else if ( is_a( $wp_upgrader->skin , 'Plugin_Installer_Skin' ) ) {
+			$plugins = array();
+			if ( ! is_null( $wp_upgrader->result  ) ) {
+				$plugin_dir = trailingslashit($wp_upgrader->result['destination']);
+				$php_files = array_filter($wp_upgrader->result['source_files'],array(&$this,'_filter_php'));
+				foreach ( $php_files as $file ) {
+					$plugin_data = get_plugin_data( $plugin_dir . $file );
+					if ( ! empty( $plugin_data['PluginURI'] ) )
+						$plugins[] = trailingslashit(basename($plugin_dir)) . $file;
+				}
+			}
+		}
+
 		if ( isset( $plugins ) )
 			foreach ( $plugins as $plugin ) {
 				$plugin_data = get_plugin_data( WP_PLUGIN_DIR . '/' . $plugin, false, true);
@@ -232,6 +263,11 @@ class GitHub_Installer {
 				if ( $repo->is_valid() )
 					$repo->set_install_info();
 			}
+	}
+	
+	
+	function _filter_php( $filename ) {
+		return pathinfo($filename,PATHINFO_EXTENSION) == 'php';
 	}
 
 }
