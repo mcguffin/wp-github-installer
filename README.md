@@ -3,11 +3,17 @@ WordPress GitHub Installer
 
 Install and update GitHub hosted WordPress plugins.
 
-Supports private repositories.
+Features
+--------
+ - Install plugins from GtHub repository URL
+ - Checks for updates
+ - Works with public and private repositories (Access token required)
+ - Translation ready (translators welcome!)
+ - Works in Multisites
 
 Plugin Developers
 -----------------
-Installation should work with any github hosted wordpress plugin, as long as
+Installation process should work with any github hosted wordpress plugin, as long as
 
  - The main plugin file is located in the root directory
  
@@ -15,7 +21,5 @@ Installation should work with any github hosted wordpress plugin, as long as
 
 ToDo:
 -----
-- settings help page
-- support themes
-- check:
-	OKAY bulk upgrade
+- install and update themes
+- be sensitive with local repositories (identified by presence of .git directory)
