@@ -14,9 +14,7 @@ Features
 Plugin Developers
 -----------------
 Installation process should work with any github hosted wordpress plugin, as long as
-
- - The main plugin file is located in the root directory
- 
+ - The main plugin file is located in the root directory 
  - The Plugin URI points to the github repository.
 
 ToDo:
