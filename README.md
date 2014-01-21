@@ -9,7 +9,7 @@ Features
  - Checks for updates
  - Works with public and private repositories (Access token required)
  - Translation ready (translators welcome!)
- - Works in Multisites
+ - Works in multisite environment
 
 Plugin Developers
 -----------------
