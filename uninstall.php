@@ -13,3 +13,10 @@ foreach ( $plugins as $plugin ) {
 		$repo->clear_cache();
 	}
 }
+
+
+if ( ! is_multisite() ) {
+	delete_option( 'github_access_token' );
+} else if ( is_multisite() ) {
+	delete_site_option( 'github_access_token'  );
+}
