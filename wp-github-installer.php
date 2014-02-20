@@ -36,36 +36,36 @@ class GitHub_Installer {
 			add_site_option( 'github_access_token' , '' , '' , 'yes' );
 		}
 		
-		add_action('plugins_loaded', array(&$this,'loaded'));
+		if ( is_admin() ) {
+			add_action('plugins_loaded', array(&$this,'loaded'));
+			// will add github notes to plugin meta
+			add_filter('plugin_row_meta',array($this,'plugin_meta'),10,4);
 		
-		
-		// will add github notes to plugin meta
-		add_filter('plugin_row_meta',array($this,'plugin_meta'),10,4);
-		
-		// will add update notices to github plugins
-		add_filter('site_transient_update_plugins',array(&$this,'filter_github_plugins'));
+			// will add update notices to github plugins
+			add_filter('site_transient_update_plugins',array(&$this,'filter_github_plugins'));
 
 
-		// will add and render the github plugin install tab
-		add_filter( 'install_plugins_tabs', array(&$this,'install_plugins_tabs') );
-		add_action('install_plugins_github' , array(&$this,'install_github_plugin') );
-		// add scripts to github tab
-		add_action( 'load-plugin-install.php' , array( &$this , 'load_plugin_install' ) );
+			// will add and render the github plugin install tab
+			add_filter( 'install_plugins_tabs', array(&$this,'install_plugins_tabs') );
+			add_action('install_plugins_github' , array(&$this,'install_github_plugin') );
+			// add scripts to github tab
+			add_action( 'load-plugin-install.php' , array( &$this , 'load_plugin_install' ) );
 
 
-		// store current installed info
-		add_action( 'upgrader_process_complete' , array( &$this , 'after_plugin_upgrade' ) , 10 , 2 );
-//		add_filter( 'upgrader_post_install' , array( &$this , 'after_plugin_install' ) , 10 , 3 );
+			// store current installed info
+			add_action( 'upgrader_process_complete' , array( &$this , 'after_plugin_upgrade' ) , 10 , 2 );
+	//		add_filter( 'upgrader_post_install' , array( &$this , 'after_plugin_install' ) , 10 , 3 );
 
-		add_filter('plugins_api',array(&$this,'github_download_api'),10,3);
+			add_filter('plugins_api',array(&$this,'github_download_api'),10,3);
 		
-		// rename downloaded source package to proper WP plugin name
-		add_filter( 'upgrader_source_selection' , array(&$this,'source_selection') , 10 , 3 );
+			// rename downloaded source package to proper WP plugin name
+			add_filter( 'upgrader_source_selection' , array(&$this,'source_selection') , 10 , 3 );
 		
 		
-		add_action( 'wp_ajax_get-github-repo-branches' , array( &$this , 'ajax_get_repo_branches' ) );
+			add_action( 'wp_ajax_get-github-repo-branches' , array( &$this , 'ajax_get_repo_branches' ) );
 		
-		add_filter( 'upgrader_pre_download' , array(&$this,'before_download') , 10 , 3);
+			add_filter( 'upgrader_pre_download' , array(&$this,'before_download') , 10 , 3);
+		}
 	}
 	
 	function before_download( $reply , $package , $upgrader ){
