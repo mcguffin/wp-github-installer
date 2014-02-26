@@ -112,7 +112,7 @@ class GitHub_Admin {
 		}
 	}
 	function check_access_token( $input ) {
-		if ( preg_match("/^([0-9a-f]+$)/i",$input) ) {
+		if ( preg_match("/^([0-9a-f]+)$/i",$input) ) { //  6b01497117b617e84f236e806e1f541ffc6f7119
 			$api = GitHub_Api::instance( );
 			$result = $api->test_access_token( $input );
 			if ( $result !== true ) {

@@ -180,12 +180,12 @@ class GitHub_Installer {
 		return false !== strpos($plugin_data['PluginURI'],'//github.com/');
 	}
 	
-	function plugin_meta($plugin_meta, $plugin_file, $plugin_data, $status){
+	function plugin_meta($plugin_meta, $plugin_file, $plugin_data, $status) {
 		if ( $this->is_github_plugin( $plugin_file, $plugin_data ) ) {
 			$repo = new GitHub_Repo( $plugin_data['PluginURI'] );
-			array_unshift($plugin_meta,'<img src="https://github.com/favicon.ico" /> ' . substr($repo->get_install_info()->commit->sha,0,10) );
+			if ( $install_info = $repo->get_install_info() )
+				array_unshift($plugin_meta,'<img src="https://github.com/favicon.ico" /> ' . substr($install_info->commit->sha,0,10) );
 		}
-		
 		return $plugin_meta;
 	}
 	function filter_github_plugins( $current ) {

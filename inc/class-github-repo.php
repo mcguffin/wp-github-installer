@@ -31,7 +31,8 @@ class GitHub_Repo {
 			// get remote data
 			$this->repo_data	= $this->api->get_repo($this->user,$this->slug);
 			$this->branches		= $this->api->get_repo_branches($this->user,$this->slug);
-			$this->branch		= $this->get_install_info()->name;
+			if ( $this->repo_data )
+				$this->branch		= $this->get_install_info()->name;
 		}
 	}
 	
@@ -64,7 +65,7 @@ class GitHub_Repo {
 	function get_install_info() {
 		if ( $commit = get_site_transient( $this->transient_key ) )
 			return $commit;
-		else 
+		else if ( $this->repo_data )
 			return (object) array(
 				'name' => $this->repo_data->default_branch,
 				'updated_at' => 0,
@@ -73,6 +74,8 @@ class GitHub_Repo {
 					'url' => '',
 				),
 			);
+		else
+			return false;
 	}
 	function delete_install_info() {
 		if ( get_site_transient( $this->transient_key ) )
@@ -83,8 +86,11 @@ class GitHub_Repo {
 	}
 	
 	function get_latest_commit( ) {
-		$branch = $this->get_install_info()->name;
-		return $this->get_branch( $branch );
+		if ( $this->repo_data ) {
+			$branch = $this->get_install_info()->name;
+			return $this->get_branch( $branch );
+		}
+		return false;
 	}
 	function get_branches( ) {
 		if ( $this->is_valid() )
@@ -97,7 +103,7 @@ class GitHub_Repo {
 		return false;
 	}
 	function get_branch( $branch_slug = false ) {
-		if ( ! $branch_slug )
+		if ( ! $branch_slug && $this->repo_data )
 			$branch_slug = $this->repo_data->default_branch;
 		if ( ! $branch_slug || ! $this->branches )
 			return false;

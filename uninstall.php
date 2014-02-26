@@ -2,6 +2,7 @@
 
 // uninstall routine
 
+require_once dirname(__FILE__).'/inc/class-github-repo.php';
 
 // get github plugin repos
 $plugins = get_plugins();
