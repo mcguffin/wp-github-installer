@@ -19,5 +19,6 @@ Installation and auto update should work with any github hosted wordpress plugin
 
 ToDo:
 -----
-- install and update themes
 - be sensitive with local repositories (identified by presence of .git directory)
+- Option: manual Plugin update check.
+- install and update themes

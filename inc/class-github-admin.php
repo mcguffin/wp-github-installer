@@ -21,6 +21,11 @@ class GitHub_Admin {
 		} else if ( is_multisite() && is_network_admin() ) {
 			add_action( 'network_admin_menu', array( &$this , 'create_network_menu' ));
 			add_action( 'network_admin_edit_update_github_settings' , array( &$this , 'save_network_settings' ) );
+			//*
+			add_action( 'all_admin_notices' , array(&$this,'settings_errors') );
+			/*/
+			add_action( 'all_admin_notices' , 'settings_errors' );
+			//*/
 		}
 		add_action( 'admin_init', array( &$this , 'register_settings' ) );
 		
@@ -61,15 +66,6 @@ class GitHub_Admin {
 			
 			<form id="github-options" method="post" action="<?php echo $action ?>">
 				<?php 
-					/*
-					if ( isset( $_POST['github_access_token'] ) && wp_verify_nonce($_POST['_wpnonce'],'github_installer-options') ) {
-						if ( is_multisite() && is_network_admin() ) {
-							update_site_option( 'github_access_token', $_POST['github_access_token'] );
-						} else {
-							update_option( 'github_access_token', $_POST['github_access_token'] );
-						}
-					}
-					*/
 					if ( $network )
 						wp_nonce_field('set_github_access_token','_update_at_nonce');
 					settings_fields( 'github_access_token' );
@@ -82,8 +78,8 @@ class GitHub_Admin {
 		<?php
 	}
 	static function input_access_token() {
-//		$access_token = GitHub_Installer::instance()->get_access_token();
-		$access_token = get_option( 'github_access_token');
+		$access_token = GitHub_Installer::instance()->get_access_token();
+//		$access_token = get_option( 'github_access_token');
 		$placeholder = __('Access Token','github');
 		if ( $access_token ) {
 			?><div class="updated"><p><?php _e('An access token has already been set. <a id="test-token" href="#">Test it</a> or <a id="show-enter-token" href="#">enter another token</a>.' , 'github' ); ?></p></div><?php
@@ -108,6 +104,7 @@ class GitHub_Admin {
 		}
 	}
 	function check_access_token( $input ) {
+		$input = trim($input);
 		if ( preg_match("/^([0-9a-f]+)$/i",$input) ) { 
 			$api = GitHub_Api::instance( );
 			$result = $api->test_access_token( $input );
@@ -128,11 +125,24 @@ class GitHub_Admin {
 			wp_die(__('Insufficient privileges'));
 		}
 		$token = $this->check_access_token( $_POST['github_access_token'] );
-		if ( $token !== false )
-			update_site_option( 'github_access_token' , $token );
+	
+		if ( ! count( get_settings_errors() ) )
+			add_settings_error('general', 'settings_updated', __('Settings saved.'), 'updated');
+		set_transient('settings_errors', get_settings_errors(), 30);
 
-		wp_redirect(add_query_arg(array('page' => 'github_installer', 'updated' => 'true'), network_admin_url('settings.php')));
+		$redirect_vars = array('page' => 'github_installer', 'settings-updated'=> 'true');
+		if ( $token !== false ) {
+			update_site_option( 'github_access_token' , $token );
+			if ( $token !== '' ) 
+				$redirect_vars['updated'] = 'true';
+		}
+		
+		wp_redirect(add_query_arg( $redirect_vars , network_admin_url('settings.php')));
 		exit();
+	}
+	
+	function settings_errors(){
+		settings_errors();
 	}
 
 	/*
