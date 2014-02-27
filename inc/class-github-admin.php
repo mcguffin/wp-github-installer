@@ -6,6 +6,9 @@
 class GitHub_Admin {
 	private static $instance;
 	
+	private $settings_page = 'github_installer';
+	private $section_name = 'github_access_token';
+	
 	public static function instance() {
 		if ( ! isset( self::$instance ) )
 			self::$instance = new self();
@@ -17,7 +20,7 @@ class GitHub_Admin {
 			add_action( 'admin_menu', array( &$this , 'create_menu' ));
 		} else if ( is_multisite() && is_network_admin() ) {
 			add_action( 'network_admin_menu', array( &$this , 'create_network_menu' ));
-			add_action('network_admin_edit_update_github_settings' , array( &$this , 'save_network_settings' ) );
+			add_action( 'network_admin_edit_update_github_settings' , array( &$this , 'save_network_settings' ) );
 		}
 		add_action( 'admin_init', array( &$this , 'register_settings' ) );
 		
@@ -34,23 +37,23 @@ class GitHub_Admin {
 	// Menu
 	// --------------------------------------------------
 	function create_network_menu() {
-		add_submenu_page( 'settings.php' , __('GitHub','github'), __('GitHub','github'), 'install_plugins', 'github_installer', array(&$this,'settings_page'));
+		add_submenu_page( 'settings.php' , __('GitHub','github'), __('GitHub','github'), 'install_plugins', $this->settings_page, array(&$this,'settings_page'));
 	}
 	
 	function create_menu() { // @ admin_menu
-		add_options_page(__('GitHub Installer','github'), __('GitHub Installer','github'), 'install_plugins', 'github_installer', array(&$this,'settings_page'));
+		add_options_page(__('GitHub Installer','github'), __('GitHub Installer','github'), 'install_plugins', $this->settings_page, array(&$this,'settings_page'));
 	}
 	
 	
 	function register_settings() { // @ admin_init
-		register_setting( 'github_access_token', 'github_installer' , array( &$this , 'check_access_token' ) );
-		add_settings_section('github_main_section', __('GitHub API-Access','github'), '__return_false', 'github_installer');
-		add_settings_field('github_access_token', __('GitHub access token','github'), array( &$this , 'input_access_token'), 'github_installer', 'github_main_section');
+		register_setting( $this->section_name , 'github_access_token', array( &$this , 'check_access_token' ) );
+		add_settings_section($this->section_name, __('GitHub API-Access','github'), '__return_false', $this->settings_page);
+		add_settings_field('github_access_token', __('GitHub access token','github'), array( &$this , 'input_access_token'), $this->settings_page, $this->section_name );
 	}
 	
 	static function settings_page() {
-		$action = is_multisite() && is_network_admin() ? 'edit.php?action=update_github_settings' : 'options.php';
 		$network = is_multisite() && is_network_admin();
+		$action = $network ? 'edit.php?action=update_github_settings' : 'options.php';
 		
 		?>
 		<div class="wrap">
@@ -69,17 +72,9 @@ class GitHub_Admin {
 					*/
 					if ( $network )
 						wp_nonce_field('set_github_access_token','_update_at_nonce');
-					?><pre><?php
 					settings_fields( 'github_access_token' );
-					?></pre><?php
 				?>
 				<?php do_settings_sections( 'github_installer' );  ?>
-				<?php 
-					// create personal access token: https://github.com/settings/applications
-					$help_class = array('github-help');
-					if ( get_option('github_access_token') )  
-						$help_class[] = 'hidden';
-				?>
 				<input type="submit" class="button-primary" value="<?php _e('Save Changes') ?>" />
 				
 			</form>
@@ -87,7 +82,8 @@ class GitHub_Admin {
 		<?php
 	}
 	static function input_access_token() {
-		$access_token = GitHub_Installer::instance()->get_access_token();
+//		$access_token = GitHub_Installer::instance()->get_access_token();
+		$access_token = get_option( 'github_access_token');
 		$placeholder = __('Access Token','github');
 		if ( $access_token ) {
 			?><div class="updated"><p><?php _e('An access token has already been set. <a id="test-token" href="#">Test it</a> or <a id="show-enter-token" href="#">enter another token</a>.' , 'github' ); ?></p></div><?php
@@ -112,7 +108,7 @@ class GitHub_Admin {
 		}
 	}
 	function check_access_token( $input ) {
-		if ( preg_match("/^([0-9a-f]+)$/i",$input) ) { //  
+		if ( preg_match("/^([0-9a-f]+)$/i",$input) ) { 
 			$api = GitHub_Api::instance( );
 			$result = $api->test_access_token( $input );
 			if ( $result !== true ) {

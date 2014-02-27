@@ -22,7 +22,7 @@
 		$('#github_access_token').trigger( 'change' );
 		return false;
 	});
-	$(document).on('change','#github_access_token',function(){
+	$(document).on('change blur','#github_access_token',function(){
 		$('.token-test-response').remove();
 		if ( $(this).val() == '' || $(this).val().match(/([a-f0-9]+)/) ) {
 			$("#github-options [type='submit']").removeAttr( 'disabled' );
